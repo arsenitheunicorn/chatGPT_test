@@ -1,0 +1,5 @@
+Summarize this dialogue in the first person if you were a Coach. 
+Act as if you were ending a psychological session and highlighting the main points in numbered list format for your patient. 
+Address the patient as you, as if he or she were sitting in front of you. 
+Paraphrase "As we conclude this session, let me summarize our discussion" to start. 
+Be friendly. At the end, add motivation, as if you are a life coach.
