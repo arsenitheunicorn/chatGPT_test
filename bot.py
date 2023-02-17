@@ -8,19 +8,26 @@ from myclasses import Filename, UserActive, Conversation
 
 base_prompt_path = "prompt_v4.txt"
 
+models = {
+    # 'ada': 'text-ada-001',
+    'ada': 'text-embedding-ada-002',
+    'davinci': 'text-davinci-003',
+    'babbage': 'babbage',
+    'curie': 'text-curie-001'
+}
+
+
 if len(sys.argv) > 1:
     bot_config_key = sys.argv[1]
 else:
     bot_config_key = 'ada'
 
-if bot_config_key == 'davinci':
-    token = os.getenv("TELEBOT_DAVINCI_API_KEY")
-    model = 'text-davinci-003'
-elif bot_config_key == 'ada':
-    token = os.getenv("TELEBOT_ADA_API_KEY")
-    model = 'text-ada-001'
+
+if bot_config_key in models:
+    model = models[bot_config_key]
+    token = os.getenv(f"TELEBOT_{bot_config_key.upper()}_API_KEY")
 else:
-    raise KeyError("wrong config")
+    raise KeyError(f"wrong config: {bot_config_key}")
 
 
 bot = telebot.TeleBot(
@@ -28,6 +35,20 @@ bot = telebot.TeleBot(
 )
 
 bot_manager = Conversation()
+
+
+@bot.message_handler(commands=['voice_off'])
+def voice_on(message: telebot.types.Message):
+    username = message.from_user.username
+    if username not in bot_manager.users:
+        bot_manager.new_user(UserActive(username, message.chat.id))
+    user: UserActive = bot_manager.users[username]
+
+    user.coachVoice = False
+    bot.send_message(
+        message.chat.id,
+        'I will give answers in **text** mode'
+    )
 
 
 @bot.message_handler(commands=['start'])
@@ -121,7 +142,9 @@ def save_prompt(message: telebot.types.Message):
 @bot.message_handler(content_types=['text', 'voice'])
 def answer_coach(message: telebot.types.Message):
     username = message.from_user.username
-    user: UserActive = bot_manager.users[username]
+    user: UserActive = bot_manager.users.get(username)
+    if message.text.startswith('/'):
+        return None
     if user.isActive:
         if message.text == '/exit':
             # inform user that a summary will come
@@ -145,58 +168,60 @@ def answer_coach(message: telebot.types.Message):
             bot_manager.deactivate_user(username)
 
             return None
-        filename_obj = Filename(username, user.conv_id, bot_config_key)
-        prompt_path = filename_obj.prompt_log
-        if message.content_type == 'text':
-            text = message.text
-        else:
-            voice_path = filename_obj.voice_path
-            file_info = bot.get_file(message.voice.file_id)
-            downloaded_file = bot.download_file(file_info.file_path)
-            with open(voice_path, 'wb') as f:
-                f.write(downloaded_file)
-            # mp3path = aifuncs.convert_audio(voice_path)
-            text = aifuncs.voice2text(voice_path)
-            # text = aifuncs.voice2text("./" + mp3path)
-            # text = aifuncs.voice2text(mp3path)
-            bot.reply_to(
-                message,
-                text="<i>"+text+"</i>",
-                parse_mode='HTML'
+        elif message.text != '/prompt':
+            filename_obj = Filename(username, user.conv_id, bot_config_key)
+            prompt_path = filename_obj.prompt_log
+            if message.content_type == 'text':
+                text = message.text
+            else:
+                voice_path = filename_obj.voice_path
+                file_info = bot.get_file(message.voice.file_id)
+                downloaded_file = bot.download_file(file_info.file_path)
+                with open(voice_path, 'wb') as f:
+                    f.write(downloaded_file)
+                # mp3path = aifuncs.convert_audio(voice_path)
+                text = aifuncs.voice2text(voice_path)
+                # text = aifuncs.voice2text("./" + mp3path)
+                # text = aifuncs.voice2text(mp3path)
+                bot.reply_to(
+                    message,
+                    text="<i>"+text+"</i>",
+                    parse_mode='HTML'
+                )
+            text.replace('\n', ' ')
+            aifuncs.write_logs(
+                prompt_path,
+                "Patient: " + text + "\nCoach: "
             )
-        aifuncs.write_logs(
-            prompt_path,
-            "Patient: " + text + "\nCoach: "
-        )
-        answer = aifuncs.call_openapi(prompt_path, model)
-        aifuncs.write_logs(
-            prompt_path,
-            answer + "\n"
-        )
-        if user.coachVoice:
-            coach_voice_path: str = f'voicing/{bot_config_key}/{username}_' + datetime.datetime.now(
-            ).strftime('%y%m%d-%H%M%S') + ".mpeg"
-            result = aifuncs.voice_generate(
-                text=answer.strip(),
-                filename=coach_voice_path
+            answer = aifuncs.call_openapi(prompt_path, model).replace('\n', ' ')
+            aifuncs.write_logs(
+                prompt_path,
+                answer + "\n"
             )
-            if result:
-                with open(coach_voice_path, 'rb') as f:
-                    bot.send_voice(
+            if user.coachVoice:
+                coach_voice_path: str = f'voicing/{bot_config_key}/{username}_' + datetime.datetime.now(
+                ).strftime('%y%m%d-%H%M%S') + ".mpeg"
+                result = aifuncs.voice_generate(
+                    text=answer.strip(),
+                    filename=coach_voice_path
+                )
+                if result:
+                    with open(coach_voice_path, 'rb') as f:
+                        bot.send_voice(
+                            user.chat_id,
+                            voice=f
+                        )
+                else:
+                    print('failed w/ voice')
+                    bot.send_message(
                         user.chat_id,
-                        voice=f
+                        text=answer
                     )
             else:
-                print('failed w/ voice')
                 bot.send_message(
                     user.chat_id,
                     text=answer
                 )
-        else:
-            bot.send_message(
-                user.chat_id,
-                text=answer
-            )
 
 
 @bot.message_handler(commands=['voice_on'])
@@ -207,17 +232,6 @@ def voice_on(message: telebot.types.Message):
     bot.send_message(
         message.chat.id,
         'I will give answers in **voice** mode'
-    )
-
-
-@bot.message_handler(commands=['voice_off'])
-def voice_on(message: telebot.types.Message):
-    username = message.from_user.username
-    user: UserActive = bot_manager.users[username]
-    user.coachVoice = False
-    bot.send_message(
-        message.chat.id,
-        'I will give answers in **text** mode'
     )
 
 

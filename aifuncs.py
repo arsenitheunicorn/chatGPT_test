@@ -36,9 +36,6 @@ def call_openapi(
     is_summary: bool = False,
     prompt: str = None
 ):
-    # if add_prompt:
-    #     with open('prompt.txt', 'r') as f:
-    #         prompt = f.read() + '\n' + prompt  # .replace('\n', ' ')
 
     if prompt is None:
         with open(prompt_path, 'r') as f:
@@ -53,6 +50,7 @@ def call_openapi(
 
     is_not_successful: bool = True
     # print(prompt)
+    max_tokens = 2048 if model_engine == "text-davinci-003" else int(2048 - estimate_tokens(prompt) - 10)
 
     while is_not_successful:
         try:
@@ -60,7 +58,7 @@ def call_openapi(
                 # model_engine="text-davinci-003",
                 model=model_engine,
                 prompt=prompt,
-                max_tokens=2048,
+                max_tokens=max_tokens,
                 temperature=0.6,
                 n=1,
                 stop=["Patient:"]
@@ -127,7 +125,9 @@ def voice_generate(
 
 
 if __name__ == '__main__':
-    print(call_openapi(
-        r"C:\Users\arsen\PycharmProjects\chatGPT_test\logs\arsenitheunicorn-20230211_023535_prompts.log",
-        is_summary=True
-    ))
+    # print(call_openapi(
+    #     r"C:\Users\arsen\PycharmProjects\chatGPT_test\logs\arsenitheunicorn-20230211_023535_prompts.log",
+    #     is_summary=True
+    # ))
+    with open('prompt_v4.txt', 'r') as f:
+        print(estimate_tokens(f.read()))
