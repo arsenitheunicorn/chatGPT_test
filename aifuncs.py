@@ -3,7 +3,8 @@ import time
 import requests
 import openai
 import whisper
-
+import json
+from typing import Union, Literal
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 # openai.Model.retrieve("text-davinci-003")
@@ -30,6 +31,27 @@ def write_logs(file_path, data):
         f.write(data)
 
 
+def write_logs_json(
+    file_path: str,
+    role: Literal['assistant', 'system', 'user'],
+    content: str):
+    """
+    Append data to the prompt json log-file
+    :param file_path: path to log-file
+    :param role:
+    :param content:
+    :return: None
+    """
+    if role != 'system':
+        with open(file_path, 'r') as fr:
+            messages = json.load(fr)
+    else:
+        messages = []
+    messages.append({'role': role, 'content': content.replace('\n', ' ').strip()})
+    with open(file_path, 'w') as fw:
+        json.dump(messages, fw)
+
+
 def call_openapi(
     prompt_path,
     model_engine: str = "text-davinci-003",
@@ -44,9 +66,9 @@ def call_openapi(
     if is_summary:
         with open('summary.txt', 'r') as f:
             task_description = f.read()
-        prompt = prompt.split("Patient:", maxsplit=1)[1]
-        prompt = task_description + "Patient:" + prompt
-        # prompt = prompt.replace('Coach:', "Me:").replace("Patient:", "You:")
+        prompt = prompt.split("Client:", maxsplit=1)[1]
+        prompt = task_description + "Client:" + prompt
+        # prompt = prompt.replace('Coach:', "Me:").replace("Client:", "You:")
 
     is_not_successful: bool = True
     # print(prompt)
@@ -59,9 +81,9 @@ def call_openapi(
                 model=model_engine,
                 prompt=prompt,
                 max_tokens=max_tokens,
-                temperature=0.6,
+                temperature=0.7,
                 n=1,
-                stop=["Patient:"]
+                stop=["Client:"]
                 # stop=["\r"]  # check how stop works
             )
             is_not_successful = False
@@ -69,6 +91,59 @@ def call_openapi(
             print("openai server failed; retrying in a sec")
             time.sleep(1)
     return response['choices'][0]['text'].strip()
+
+
+def build_prompt_from_json(
+    messages: list[dict]
+) -> str:
+    """
+    ChatGPT logs into OpenAI-built conversation
+    :param messages: list of log dicts
+    :return:
+    """
+    text = ''
+    for entity in messages:
+        role = entity.get('role')
+        content = entity.get('content')
+        if role:
+            if role == 'user':
+                text += 'Client: '
+            elif role == 'assistant':
+                text += 'Coach: '
+        text += content
+        text += '\n'
+    return text.strip()
+
+
+def call_chatgpt(
+    prompt_path,
+    model_engine: str = 'gpt-3.5-turbo',
+    is_summary: bool = False,
+    # prompt: Union[str, None] = None
+):
+    with open(prompt_path, 'r') as f:
+        messages = json.load(f)
+
+    if is_summary:
+        call_openapi(
+            prompt_path='',
+            is_summary=True,
+            prompt=build_prompt_from_json(messages)
+        )
+
+    is_not_successful: bool = True
+    while is_not_successful:
+        try:
+            response = openai.ChatCompletion.create(
+                # model_engine="text-davinci-003",
+                model=model_engine,
+                messages=messages
+            )
+            is_not_successful = False
+        except openai.error.RateLimitError:
+            print("openai server failed; retrying in a sec")
+            time.sleep(1)
+    return response['choices'][0].message.content.strip()
 
 
 def voice2text(fpath: str) -> str:
@@ -129,5 +204,6 @@ if __name__ == '__main__':
     #     r"C:\Users\arsen\PycharmProjects\chatGPT_test\logs\arsenitheunicorn-20230211_023535_prompts.log",
     #     is_summary=True
     # ))
-    with open('prompt_v4.txt', 'r') as f:
-        print(estimate_tokens(f.read()))
+    for i in range(9):
+        with open(f'summ_logs/{i}.log', 'r') as f:
+            print(i, estimate_tokens(f.read()))

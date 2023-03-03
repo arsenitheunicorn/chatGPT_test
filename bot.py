@@ -1,7 +1,7 @@
 import datetime
 import os
 import sys
-
+from time import sleep
 import telebot
 import aifuncs
 from myclasses import Filename, UserActive, Conversation
@@ -9,11 +9,12 @@ from myclasses import Filename, UserActive, Conversation
 base_prompt_path = "prompt_v4.txt"
 
 models = {
-    # 'ada': 'text-ada-001',
-    'ada': 'text-embedding-ada-002',
+    'ada': 'text-ada-001',
+    # 'ada': 'text-embedding-ada-002',
     'davinci': 'text-davinci-003',
     'babbage': 'babbage',
-    'curie': 'text-curie-001'
+    'curie': 'text-curie-001',
+    'chat': 'gpt-3.5-turbo'
 }
 
 
@@ -69,12 +70,20 @@ def start_conversation(message: telebot.types.Message):
             with open(base_prompt_path, 'r') as f:
                 prompt = f.read()
         bot_manager.activate_user(username)
-        aifuncs.write_logs(
-            Filename(
-                username, bot_manager.users[username].conv_id, bot_config_key
-            ).prompt_log,
-            prompt + "\n"
-        )
+        filename = Filename(
+                    username, bot_manager.users[username].conv_id, bot_config_key
+                ).prompt_log
+        if bot_config_key == 'chat':
+            aifuncs.write_logs_json(
+                filename,
+                role='system',
+                content=prompt.strip()
+            )
+        else:
+            aifuncs.write_logs(
+                filename,
+                prompt + "\n"
+            )
         bot.send_message(
             chat_id=chat_id,
             text="What's on your mind today that you would like to work on in our coaching session?"
@@ -94,11 +103,17 @@ def exit_conversation(message: telebot.types.Message):
         filename = Filename(
             username, user.conv_id, bot_config_key
         ).prompt_log
-        summary = aifuncs.call_openapi(
-            prompt_path=filename,
-            model_engine=model,
-            is_summary=True
-        )
+        if bot_config_key == 'chat':
+            summary = aifuncs.call_chatgpt(
+                prompt_path=filename,
+                is_summary=True
+            )
+        else:
+            summary = aifuncs.call_openapi(
+                prompt_path=filename,
+                model_engine=model,
+                is_summary=True
+            )
         bot.send_message(
             user.chat_id,
             text=summary
@@ -146,82 +161,70 @@ def answer_coach(message: telebot.types.Message):
     if message.text.startswith('/'):
         return None
     if user.isActive:
-        if message.text == '/exit':
-            # inform user that a summary will come
-            bot.send_message(
-                user.chat_id,
-                "You have ended the conversation!\nYour summary will arrive in a blink..."
+        filename_obj = Filename(username, user.conv_id, bot_config_key)
+        prompt_path: str = filename_obj.prompt_log
+        if message.content_type == 'text':
+            text = message.text
+        else:
+            voice_path = filename_obj.voice_path
+            file_info = bot.get_file(message.voice.file_id)
+            downloaded_file = bot.download_file(file_info.file_path)
+            with open(voice_path, 'wb') as f:
+                f.write(downloaded_file)
+            text = aifuncs.voice2text(voice_path)
+            bot.reply_to(
+                message,
+                text="<i>"+text+"</i>",
+                parse_mode='HTML'
             )
-            filename = Filename(
-                username, user.conv_id, bot_config_key
-            ).prompt_log
-            summary = aifuncs.call_openapi(
-                prompt_path=filename,
-                model_engine=model,
-                is_summary=True
-            )
-            bot.send_message(
-                user.chat_id,
-                text=summary
-            )
-
-            bot_manager.deactivate_user(username)
-
-            return None
-        elif message.text != '/prompt':
-            filename_obj = Filename(username, user.conv_id, bot_config_key)
-            prompt_path = filename_obj.prompt_log
-            if message.content_type == 'text':
-                text = message.text
-            else:
-                voice_path = filename_obj.voice_path
-                file_info = bot.get_file(message.voice.file_id)
-                downloaded_file = bot.download_file(file_info.file_path)
-                with open(voice_path, 'wb') as f:
-                    f.write(downloaded_file)
-                # mp3path = aifuncs.convert_audio(voice_path)
-                text = aifuncs.voice2text(voice_path)
-                # text = aifuncs.voice2text("./" + mp3path)
-                # text = aifuncs.voice2text(mp3path)
-                bot.reply_to(
-                    message,
-                    text="<i>"+text+"</i>",
-                    parse_mode='HTML'
-                )
-            text.replace('\n', ' ')
+        text.replace('\n', ' ')
+        if bot_config_key != 'chat':
             aifuncs.write_logs(
                 prompt_path,
-                "Patient: " + text + "\nCoach: "
+                "Client: " + text + "\nCoach: "
             )
             answer = aifuncs.call_openapi(prompt_path, model).replace('\n', ' ')
             aifuncs.write_logs(
                 prompt_path,
                 answer + "\n"
             )
-            if user.coachVoice:
-                coach_voice_path: str = f'voicing/{bot_config_key}/{username}_' + datetime.datetime.now(
-                ).strftime('%y%m%d-%H%M%S') + ".mpeg"
-                result = aifuncs.voice_generate(
-                    text=answer.strip(),
-                    filename=coach_voice_path
-                )
-                if result:
-                    with open(coach_voice_path, 'rb') as f:
-                        bot.send_voice(
-                            user.chat_id,
-                            voice=f
-                        )
-                else:
-                    print('failed w/ voice')
-                    bot.send_message(
+        else:
+            aifuncs.write_logs_json(
+                prompt_path,
+                role='user',
+                content=text.strip()
+            )
+            answer = aifuncs.call_chatgpt(prompt_path)
+            aifuncs.write_logs_json(
+                prompt_path,
+                role='assistant',
+                content=answer.strip()
+            )
+
+        if user.coachVoice:
+            coach_voice_path: str = f'voicing/{bot_config_key}/{username}_' + datetime.datetime.now(
+            ).strftime('%y%m%d-%H%M%S') + ".mpeg"
+            result = aifuncs.voice_generate(
+                text=answer.strip(),
+                filename=coach_voice_path
+            )
+            if result:
+                with open(coach_voice_path, 'rb') as f:
+                    bot.send_voice(
                         user.chat_id,
-                        text=answer
+                        voice=f
                     )
             else:
+                print('failed w/ voice')
                 bot.send_message(
                     user.chat_id,
                     text=answer
                 )
+        else:
+            bot.send_message(
+                user.chat_id,
+                text=answer
+            )
 
 
 @bot.message_handler(commands=['voice_on'])
@@ -235,4 +238,8 @@ def voice_on(message: telebot.types.Message):
     )
 
 
-bot.infinity_polling()
+while True:
+    try:
+        bot.infinity_polling()
+    except Exception:
+        sleep(10)
