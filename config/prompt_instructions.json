@@ -1,0 +1,38 @@
+{
+    "0": {
+        "fmt": []
+    },
+    "1": {
+        "fmt": ["name"]
+    },
+    "2": {
+        "fmt": ["goal", "name"]
+    },
+    "2.5": {
+        "fmt": []
+    },
+    "3": {
+        "fmt": ["name"]
+    },
+    "4": {
+        "fmt": ["name", "attempts"]
+    },
+    "5": {
+        "fmt": ["stopping", "name"]
+    },
+    "6": {
+        "fmt": ["goal", "name"]
+    },
+    "7": {
+        "fmt": ["name"]
+    },
+    "7.5": {
+        "fmt": ["name"]
+    },
+    "final": {
+        "fmt": ["name", "name"]
+    },
+    "main": {
+        "fmt": ["name", "attempts", "stopping", "goal"]
+    }
+}
