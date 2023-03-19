@@ -4,7 +4,7 @@ import requests
 import openai
 import whisper
 import json
-from typing import Union, Literal
+from typing import Optional, Literal
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 # openai.Model.retrieve("text-davinci-003")
@@ -73,7 +73,7 @@ def call_openapi(
     is_not_successful: bool = True
     # print(prompt)
     max_tokens = 2048 if model_engine == "text-davinci-003" else int(2048 - estimate_tokens(prompt) - 10)
-
+    print(f"{estimate_tokens(prompt)=}")
     while is_not_successful:
         try:
             response = openai.Completion.create(
@@ -87,9 +87,12 @@ def call_openapi(
                 # stop=["\r"]  # check how stop works
             )
             is_not_successful = False
-        except openai.error.RateLimitError:
-            print("openai server failed; retrying in a sec")
-            time.sleep(1)
+        # except openai.error.RateLimitError:
+        #     print("openai server failed; retrying in a sec")
+        #     time.sleep(1)
+        except Exception as e:
+            print(e)
+            time.sleep(2)
     return response['choices'][0]['text'].strip()
 
 
@@ -119,10 +122,11 @@ def call_chatgpt(
     prompt_path,
     model_engine: str = 'gpt-3.5-turbo',
     is_summary: bool = False,
-    # prompt: Union[str, None] = None
+    messages: Optional[dict] = None
 ):
-    with open(prompt_path, 'r') as f:
-        messages = json.load(f)
+    if messages is None:
+        with open(prompt_path, 'r') as f:
+            messages = json.load(f)
 
     if is_summary:
         call_openapi(

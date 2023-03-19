@@ -1,4 +1,22 @@
 from datetime import datetime
+from dataclasses import dataclass
+from typing import Optional
+
+
+class UserData:
+    def __init__(self):
+        self.name: Optional[str] = None
+        self.goal: Optional[str] = None
+        self.attempts: Optional[str] = None
+        self.stopping: Optional[str] = None
+        self.smart_s: Optional[str] = None
+        self.smart_m: Optional[str] = None
+        self.smart_a: Optional[str] = None
+        self.smart_r: Optional[str] = None
+        self.smart_t: Optional[str] = None
+
+    def __repr__(self):
+        return "UserData:\n" + "\n".join(["%s: %s" % item for item in vars(self).items()])
 
 
 class Filename:
@@ -10,13 +28,15 @@ class Filename:
 
 
 class UserActive:
-    def __init__(self, username, chat_id):
+    def __init__(self, username, chat_id, coachVoice=False):
         self.username: str = username.strip('@')
         self.isActive: bool = False
         self.chat_id: str = chat_id
         self.conv_id: str = datetime.now().strftime('%Y%m%d_%H%M%S')
-        self.coachVoice: bool = True
-        self.prompt_text: str = None
+        self.coachVoice: bool = coachVoice
+        self.prompt_text: Optional[str] = None
+        self.user_data: UserData = UserData()
+        self.pretreatment_step: Optional[int, float] = 0
 
     def __eq__(self, other):
         if isinstance(other, UserActive):
@@ -27,6 +47,8 @@ class UserActive:
 
     def set_active_status(self, t: bool):
         self.isActive = t
+        if t:
+            self.pretreatment_step = 0
 
 
 class Conversation:
@@ -51,3 +73,12 @@ class Conversation:
 
     def deactivate_user(self, username):
         self._change_status_user(username, False)
+
+
+if __name__ == '__main__':
+    u = UserActive(
+        'test', '11314'
+    )
+    u.user_data.name = 'Lisa'
+    setattr(u.user_data, 'goal', 'to find a job')
+    print(u.user_data)
