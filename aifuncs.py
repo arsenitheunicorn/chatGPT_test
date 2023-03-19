@@ -4,7 +4,7 @@ import requests
 import openai
 import whisper
 import json
-from typing import Optional, Literal
+from typing import Optional, Literal, Union
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 # openai.Model.retrieve("text-davinci-003")
@@ -56,7 +56,7 @@ def call_openapi(
     prompt_path,
     model_engine: str = "text-davinci-003",
     is_summary: bool = False,
-    prompt: Optional[str, tuple] = None
+    prompt: Union[str, tuple, None] = None
 ):
 
     if prompt is None:
