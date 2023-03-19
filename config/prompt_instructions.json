@@ -20,6 +20,9 @@
     "5": {
         "fmt": ["stopping", "name"]
     },
+    "5.5": {
+        "fmt": []
+    },
     "6": {
         "fmt": ["goal", "name"]
     },

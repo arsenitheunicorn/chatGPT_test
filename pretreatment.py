@@ -18,7 +18,7 @@ def read_prompt(
 ):
     with open(prompt_path, 'r') as f:
         prompt: str = f.read().format(
-            [getattr(user_active.user_data, attr_name) for attr_name in prompt_instructions[step_id]['fmt']]
+            *[getattr(user_active.user_data, attr_name) for attr_name in prompt_instructions[step_id]['fmt']]
         )
     return prompt
 
@@ -26,7 +26,10 @@ def read_prompt(
 def yes_or_no(answer: str) -> bool:
     prompt = """Evaluate the following statement if it is a 'yes' or a 'no'. 
     Answer in a single word, only 'yes' or 'no'. Statement = {}"""
-
+    if answer.lower().startswith('ye'):
+        return True
+    elif answer.lower().startswith('no'):
+        return False
     output = aifuncs.call_openapi(
         prompt_path=None,
         prompt=prompt.format(answer)
@@ -44,17 +47,20 @@ def extract_info(
     prompt = """You will recieve a statement. 
     I need you to extract some Key information out of it and reformulate it as a thesis.
     Give the answer in minimum words. For example, if I ask you to get a name - answer with only this name.
-    Don't answer in full sentences.
+    Don't answer in full sentences. Give your answer like this: "Answer: ..."
     
     Statement = {}
     
     Information = {}
     """
+    if ' ' not in answer:
+        return answer
+
     output = aifuncs.call_openapi(
         prompt_path=None,
         prompt=prompt.format(answer, info_needed)
     )
-    return output
+    return output.replace('[', '').replace(']', '').replace("Answer:", '').strip()
 
 
 def step_call(
@@ -71,7 +77,7 @@ def step_call(
         prompt=prompt
     )
     print('called successfully', step_id)
-    return answer
+    return answer.strip(' .\n')
 
 #
 # def pretreatment_manager(

@@ -87,12 +87,12 @@ def call_openapi(
                 # stop=["\r"]  # check how stop works
             )
             is_not_successful = False
-        # except openai.error.RateLimitError:
-        #     print("openai server failed; retrying in a sec")
-        #     time.sleep(1)
-        except Exception as e:
-            print(e)
-            time.sleep(2)
+        except openai.error.RateLimitError:
+            print("openai server failed; retrying in a sec")
+            time.sleep(1)
+        # except Exception as e:
+        #     print(e)
+        #     time.sleep(2)
     return response['choices'][0]['text'].strip()
 
 
@@ -182,6 +182,7 @@ def voice_generate(
     :param xi_api_key:
     :return: filepath of saved voicing
     """
+    text = text.replace('\n', ' ').replace('"', '')
     root = "https://api.elevenlabs.io"
     response = requests.post(
         url=root + "/v1/text-to-speech/" + voice_id,

@@ -69,10 +69,36 @@ def start_conversation(message: telebot.types.Message):
     if not bot_manager.users[username].isActive:
         bot_manager.activate_user(username)
 
-        bot.send_message(
-            chat_id=chat_id,
-            text=pretreatment.step_call(user_active=bot_manager.users[username])
-        )
+        # bot.send_message(
+        #     chat_id=chat_id,
+        #     text=pretreatment.step_call(user_active=bot_manager.users[username])
+        # )
+        user = bot_manager.users[username]
+        answer = pretreatment.step_call(user_active=user)
+        if user.coachVoice:
+            coach_voice_path: str = f'voicing/{bot_config_key}/{username}_' + datetime.datetime.now(
+            ).strftime('%y%m%d-%H%M%S') + ".mpeg"
+            result = aifuncs.voice_generate(
+                text=answer.strip(),
+                filename=coach_voice_path
+            )
+            if result:
+                with open(coach_voice_path, 'rb') as f:
+                    bot.send_voice(
+                        user.chat_id,
+                        voice=f
+                    )
+            else:
+                print('failed w/ voice')
+                bot.send_message(
+                    user.chat_id,
+                    text=answer
+                )
+        else:
+            bot.send_message(
+                user.chat_id,
+                text=answer
+            )
         # bot_manager.users[username].pretreatment_step += 1
 
 
@@ -188,11 +214,10 @@ def answer_coach(message: telebot.types.Message):
             user.pretreatment_step += True
             if user.pretreatment_step < 8:
                 ### Need to add SMART module here
-                # if user.pretreatment_step != 6:
-                #     answer = pretreatment.step_call(user)
-                # else:
-                #     pass
+                if user.pretreatment_step == 6:
+                    user.pretreatment_step += True
                 answer = pretreatment.step_call(user)
+                # answer = pretreatment.step_call(user)
             else:
                 prompt = pretreatment.read_prompt(base_prompt_path, user, 'main')
 
