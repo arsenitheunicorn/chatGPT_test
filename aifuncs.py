@@ -56,7 +56,7 @@ def call_openapi(
     prompt_path,
     model_engine: str = "text-davinci-003",
     is_summary: bool = False,
-    prompt: str = None
+    prompt: Optional[str, tuple] = None
 ):
 
     if prompt is None:
@@ -130,7 +130,7 @@ def call_chatgpt(
 
     if is_summary:
         call_openapi(
-            prompt_path='',
+            prompt_path=None,
             is_summary=True,
             prompt=build_prompt_from_json(messages)
         )

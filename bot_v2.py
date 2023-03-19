@@ -115,17 +115,11 @@ def exit_conversation(message: telebot.types.Message):
         filename = Filename(
             username, user.conv_id, bot_config_key
         ).prompt_log
-        if bot_config_key == 'chat':
-            summary = aifuncs.call_chatgpt(
+        summary = aifuncs.call_chatgpt(
                 prompt_path=filename,
                 is_summary=True
             )
-        else:
-            summary = aifuncs.call_openapi(
-                prompt_path=filename,
-                model_engine=model,
-                is_summary=True
-            )
+
         bot.send_message(
             user.chat_id,
             text=summary

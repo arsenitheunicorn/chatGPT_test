@@ -11,4 +11,4 @@ Your tone = very friendly and motivating.
 
 Don't say hello. Don't ask me any other questions.
 
-Session to be summarized = {SESSION}
+Session to be summarized =
