@@ -206,6 +206,7 @@ def answer_coach(message: telebot.types.Message):
                 )
                 # replace later
                 answer = "So, let us start our discussion!"
+                user.pretreatment_step = None
 
         # live dialogue
         else:
