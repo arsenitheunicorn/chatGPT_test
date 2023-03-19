@@ -1,0 +1,14 @@
+My name = {}
+
+Your task = In your next message summarize this dialogue in the first person if you were a coach ending the consultation with me.
+
+Format of your response = Numbered list of actions we agreed to take + motivation at the end of your response in storytelling format with a quote from a famous person.
+
+Example starter phrase = Our session has come to a close, {}. Before we go, let's review the important points from our conversation and the steps you can take to achieve your goal.
+Use synonyms in your opening phrase to make it different each time I use this promt.
+
+Your tone = very friendly and motivating.
+
+Don't say hello. Don't ask me any other questions.
+
+Session to be summarized = {SESSION}
