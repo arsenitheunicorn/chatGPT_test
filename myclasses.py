@@ -1,6 +1,7 @@
 from datetime import datetime
 from dataclasses import dataclass
 from typing import Optional
+import re
 
 
 class UserData:
@@ -9,11 +10,31 @@ class UserData:
         self.goal: Optional[str] = None
         self.attempts: Optional[str] = None
         self.stopping: Optional[str] = None
-        self.smart_s: Optional[str] = None
-        self.smart_m: Optional[str] = None
-        self.smart_a: Optional[str] = None
-        self.smart_r: Optional[str] = None
-        self.smart_t: Optional[str] = None
+        self.smart_names: dict[str, str] = {
+            'Specific': '',
+            'Measurable': '',
+            'Achievable': '',
+            'Relevant': '',
+            'Time-bound': ''
+        }
+        self.smart_cycle_on = False
+
+    def is_smart_still_on(self, text: str):
+        sm_names: list = list(self.smart_names.keys())
+        for name in sm_names:
+            re_search = re.search(f"{name}:(.+)\n", text)
+            if re_search is None:
+                return True
+            else:
+                self.smart_names[name] = re_search.group()
+        self.smart_cycle_on = False
+        return False
+
+    def smart_repr(self) -> str:
+        output: str = ''
+        for name, description in self.smart_names.items():
+            output += name + ': ' + description + '\n'
+        return output
 
     def __repr__(self):
         return "UserData:\n" + "\n".join(["%s: %s" % item for item in vars(self).items()])
@@ -22,7 +43,7 @@ class UserData:
 class Filename:
     def __init__(self, username, chat_id, bot_config_key):
         log_path: str = username.replace("@", "") + "-" + chat_id
-        self.history_log: str = f"logs/{bot_config_key}/{log_path}.log"
+        self.smart_log: str = f"logs/{bot_config_key}/{log_path}_smart.json"
         self.prompt_log: str = f"logs/{bot_config_key}/{log_path}_prompts.log"
         self.voice_path: str = f"audio/{bot_config_key}/{log_path}_" + datetime.now().strftime('%Y%m%d%H%M%S') + ".ogg"
 

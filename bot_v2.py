@@ -16,7 +16,8 @@ models = {
     'babbage': 'babbage',
     'curie': 'text-curie-001',
     'chat': 'gpt-3.5-turbo',
-    'script': 'gpt-3.5-turbo'
+    'script': 'gpt-3.5-turbo',
+    'smart': 'gpt-3.5-turbo'
 }
 
 
@@ -63,7 +64,7 @@ def start_conversation(message: telebot.types.Message):
             UserActive(
                 username=username,
                 chat_id=chat_id,
-                coachVoice=True
+                coachVoice=bot_config_key=='script'
             )
         )
     if not bot_manager.users[username].isActive:
@@ -116,9 +117,9 @@ def exit_conversation(message: telebot.types.Message):
             username, user.conv_id, bot_config_key
         ).prompt_log
         summary = aifuncs.call_chatgpt(
-                prompt_path=filename,
-                is_summary=True
-            )
+            prompt_path=filename,
+            is_summary=True
+        )
 
         bot.send_message(
             user.chat_id,
@@ -184,33 +185,75 @@ def answer_coach(message: telebot.types.Message):
                 text="<i>"+text+"</i>",
                 parse_mode='HTML'
             )
-        text.replace('\n', ' ')
+        text = text.replace('\n', ' ')
+        print(f"{text = }")
 
         # scripting
         if user.pretreatment_step is not None:
+            print("---- scripting if chain entered ----")
+            print(f"{user.pretreatment_step = }")
             if user.pretreatment_step == 0:
                 name = pretreatment.extract_info('Name', text)
                 setattr(user.user_data, 'name', name)
+                print("setattr(user.user_data, 'name', name)")
             elif user.pretreatment_step == 1:
                 goal = pretreatment.extract_info('Goal', text)
                 setattr(user.user_data, 'goal', goal)
+                print("setattr(user.user_data, 'goal', goal)")
             elif user.pretreatment_step in [2, 5, 7]:
                 if not pretreatment.yes_or_no(text):
+                    print('> no => ps -= .5')
                     user.pretreatment_step -= .5
+                elif user.pretreatment_step == 5:
+                    print(f"> {user.user_data.smart_cycle_on = }")
+                    user.user_data.smart_cycle_on = True
+                    print(f"> {user.user_data.smart_cycle_on = }")
             elif user.pretreatment_step == 3:
                 setattr(user.user_data, 'attempts', text)
+                print("setattr(user.user_data, 'attempts', text)")
             elif user.pretreatment_step == 4:
                 setattr(user.user_data, 'stopping', text)
+                print("setattr(user.user_data, 'stopping', text)")
             elif user.pretreatment_step == 2.5 or user.pretreatment_step == 5.5:
+                print('> no => ps -= 1.5')
                 user.pretreatment_step -= 1.5
-
+            print("---- scripting if chain escaped ----")
             # increment step after conditional checking
-            user.pretreatment_step += True
+            if not (user.user_data.smart_cycle_on and user.pretreatment_step == 6):
+                user.pretreatment_step += True
             if user.pretreatment_step < 8:
-                ### Need to add SMART module here
+                # SMART module here
                 if user.pretreatment_step == 6:
-                    user.pretreatment_step += True
-                answer = pretreatment.step_call(user)
+                    smart_log_path = Filename(
+                        username, user.conv_id, bot_config_key).smart_log
+                    print(f"{smart_log_path = }")
+                    if not os.path.exists(smart_log_path):
+                        print("-- first SMART")
+                        with open(smart_log_path, 'w') as fj:
+                            pass
+                        aifuncs.write_logs_json(
+                            smart_log_path,
+                            role='system',
+                            content=pretreatment.read_prompt(
+                                r'C:\Users\arsen\PycharmProjects\chatGPT_test\prompts\6_smartGoal.txt',
+                                user_active=user,
+                                step_id='6'
+                            )
+                        )
+                    else:
+                        print("-- contin SMART")
+                        aifuncs.write_logs_json(
+                            smart_log_path,
+                            role='user',
+                            content=text
+                        )
+                    answer = aifuncs.call_chatgpt(smart_log_path)
+                    smart_still_on = user.user_data.is_smart_still_on(answer)
+                    print(f"{smart_still_on = }")
+
+                else:
+                    print(f"-- usual step_call ({user.pretreatment_step = })")
+                    answer = pretreatment.step_call(user)
                 # answer = pretreatment.step_call(user)
             else:
                 prompt = pretreatment.read_prompt(base_prompt_path, user, 'main')
@@ -218,17 +261,21 @@ def answer_coach(message: telebot.types.Message):
                 filename = Filename(
                     username, bot_manager.users[username].conv_id, bot_config_key
                 ).prompt_log
+                with open(filename, 'w') as fj:
+                    pass
                 aifuncs.write_logs_json(
                         filename,
                         role='system',
                         content=prompt.strip()
                 )
                 # replace later
-                answer = "So, let us start our discussion!"
+                answer = aifuncs.call_chatgpt(filename)
                 user.pretreatment_step = None
+                print(f"finally! {user.pretreatment_step = }")
 
         # live dialogue
         else:
+            print("---- LIVE")
             aifuncs.write_logs_json(
                 prompt_path,
                 role='user',
